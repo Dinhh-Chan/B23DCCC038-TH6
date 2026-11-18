@@ -2,6 +2,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { directConvId } from '../commons/conversation';
 import { normalize } from '../commons/utils';
 import { ContactItem, ScreenHeader, SearchBar } from '../components';
 import { useApp } from '../contexts/AppContext';
@@ -10,7 +11,7 @@ import { RootStackParamList } from '../navigation/types';
 export default function ContactsScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { colors, users } = useApp();
+  const { colors, users, account } = useApp();
   const [query, setQuery] = useState('');
 
   const onlineCount = users.filter(u => u.online).length;
@@ -48,7 +49,11 @@ export default function ContactsScreen() {
         renderItem={({ item }) => (
           <ContactItem
             user={item}
-            onPress={() => navigation.navigate('Chat', { userId: item.uid })}
+            onPress={() =>
+              navigation.navigate('Chat', {
+                convId: directConvId(account?.uid ?? '', item.uid),
+              })
+            }
           />
         )}
         ListEmptyComponent={

@@ -1,4 +1,6 @@
-import { Bell, LogOut, Mail, Moon, User } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Bell, LogOut, Mail, Moon, Pencil, User } from 'lucide-react-native';
 import { ReactNode } from 'react';
 import {
   Alert,
@@ -12,6 +14,7 @@ import {
 import { Colors } from '../commons/theme';
 import { Avatar, ScreenHeader } from '../components';
 import { useApp } from '../contexts/AppContext';
+import { RootStackParamList } from '../navigation/types';
 
 type RowProps = {
   colors: Colors;
@@ -39,6 +42,8 @@ function Row({ colors, icon, label, value, right }: RowProps) {
 }
 
 export default function SettingsScreen() {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {
     colors,
     account,
@@ -74,6 +79,15 @@ export default function SettingsScreen() {
           <Text style={[styles.username, { color: colors.subText }]}>
             {account.email}
           </Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('EditProfile')}
+            style={[styles.edit, { backgroundColor: colors.primaryLight }]}
+          >
+            <Pencil size={15} color={colors.primary} />
+            <Text style={[styles.editText, { color: colors.primary }]}>
+              Chỉnh sửa hồ sơ
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={[styles.section, { color: colors.subText }]}>
@@ -147,6 +161,16 @@ const styles = StyleSheet.create({
   },
   name: { fontSize: 20, fontWeight: '800', marginTop: 12 },
   username: { fontSize: 14, marginTop: 4 },
+  edit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+  },
+  editText: { fontSize: 13, fontWeight: '700' },
   section: {
     fontSize: 12,
     fontWeight: '700',

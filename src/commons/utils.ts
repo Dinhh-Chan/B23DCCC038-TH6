@@ -36,3 +36,25 @@ export function formatListTime(timestamp: number) {
   }
   return days === 1 ? 'Hôm qua' : ddmm(d);
 }
+
+// "Hoạt động X phút trước" khi người kia offline
+export function formatLastActive(timestamp?: number, now = Date.now()) {
+  if (!timestamp) return 'Ngoại tuyến';
+  const minutes = Math.floor((now - timestamp) / 60000);
+  if (minutes < 1) return 'Hoạt động vừa xong';
+  if (minutes < 60) return `Hoạt động ${minutes} phút trước`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Hoạt động ${hours} giờ trước`;
+  return `Hoạt động ${Math.floor(hours / 24)} ngày trước`;
+}
+
+// Thời gian ở danh sách thông báo: "Vừa xong", "5 phút trước", "Hôm qua"...
+export function formatRelative(timestamp: number, now = Date.now()) {
+  const minutes = Math.floor((now - timestamp) / 60000);
+  if (minutes < 1) return 'Vừa xong';
+  if (minutes < 60) return `${minutes} phút trước`;
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} giờ trước`;
+  return formatListTime(timestamp);
+}
+
+export const formatClock = (timestamp: number) => hhmm(new Date(timestamp));

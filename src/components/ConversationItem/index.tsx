@@ -1,37 +1,33 @@
+import { ReactNode } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
-import { Contact, Conversation } from '../../commons/types';
-import { formatListTime } from '../../commons/utils';
 import { useApp } from '../../contexts/AppContext';
-import Avatar from '../Avatar';
 import { styles } from './styles';
 
 type Props = {
-  conversation: Conversation;
-  user: Contact;
+  title: string;
+  avatar: ReactNode;
+  preview: string; // dòng tin cuối: "Bạn: ...", "📷 Hình ảnh", "📍 Vị trí"...
+  time: string;
+  unread: number;
   onPress: () => void;
 };
 
-export default function ConversationItem({
-  conversation,
-  user,
-  onPress,
-}: Props) {
-  const { colors, account } = useApp();
-  const hasUnread = conversation.unread > 0;
-  const fromMe = conversation.lastSenderId === account?.uid;
-  const preview = `${fromMe ? 'Bạn: ' : ''}${conversation.lastMessage}`;
+export default function ConversationItem(props: Props) {
+  const { colors } = useApp();
+  const hasUnread = props.unread > 0;
 
   return (
     <TouchableOpacity
       activeOpacity={0.7}
-      onPress={onPress}
+      onPress={props.onPress}
+      accessibilityLabel={`Cuộc trò chuyện ${props.title}`}
       style={[styles.container, { backgroundColor: colors.card }]}
     >
-      <Avatar uri={user.avatar} online={user.online} />
+      {props.avatar}
       <View style={styles.body}>
         <View style={styles.row}>
           <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
-            {user.name}
+            {props.title}
           </Text>
           <Text
             style={[
@@ -39,7 +35,7 @@ export default function ConversationItem({
               { color: hasUnread ? colors.primary : colors.subText },
             ]}
           >
-            {formatListTime(conversation.updatedAt)}
+            {props.time}
           </Text>
         </View>
         <View style={styles.row}>
@@ -52,12 +48,12 @@ export default function ConversationItem({
                 : { color: colors.subText },
             ]}
           >
-            {preview}
+            {props.preview}
           </Text>
           {hasUnread && (
             <View style={[styles.badge, { backgroundColor: colors.primary }]}>
               <Text style={[styles.badgeText, { color: colors.onPrimary }]}>
-                {conversation.unread > 99 ? '99+' : conversation.unread}
+                {props.unread > 99 ? '99+' : props.unread}
               </Text>
             </View>
           )}

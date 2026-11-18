@@ -9,12 +9,13 @@ import {
   useRef,
   useState,
 } from 'react';
-import { AppNotification, NOTIFICATIONS } from '../commons/data';
 import { Colors, darkColors, lightColors } from '../commons/theme';
 import {
   Account,
+  AppNotification,
   Contact,
   Conversation,
+  ConversationMeta,
   UserProfile,
   UserStatus,
 } from '../commons/types';
@@ -22,7 +23,15 @@ import {
   logout as firebaseLogout,
   subscribeAuth,
 } from '../services/authService';
-import { subscribeConversations } from '../services/chatService';
+import {
+  subscribeChatSummaries,
+  subscribeConversation,
+} from '../services/chatService';
+import {
+  markAllNotificationsRead,
+  markNotificationRead,
+  subscribeNotifications,
+} from '../services/notificationService';
 import {
   avatarFor,
   startPresence,
@@ -36,10 +45,13 @@ type AppContextValue = {
   logout: () => Promise<void>;
 
   users: Contact[]; // mọi người đã đăng ký, trừ bản thân
-  getUser: (uid: string) => Contact | undefined;
-  conversations: Conversation[];
+  getUser: (uid: string) => Contact | undefined; // kể cả bản thân
+
+  conversations: Conversation[]; // 1-1 và nhóm, mới nhất lên đầu
+  getConversation: (convId: string) => Conversation | undefined;
 
   notifications: AppNotification[];
+  unreadNotificationCount: number;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
 
@@ -57,9 +69,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [statuses, setStatuses] = useState<Record<string, UserStatus>>({});
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [notifications, setNotifications] =
-    useState<AppNotification[]>(NOTIFICATIONS);
+  const [summaries, setSummaries] = useState<Conversation[]>([]);
+  const [metas, setMetas] = useState<Record<string, ConversationMeta | null>>(
+    {},
+  );
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [darkMode, setDarkMode] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const unsubscribersRef = useRef<(() => void)[]>([]);
@@ -85,39 +99,64 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!uid) {
       setProfiles([]);
       setStatuses({});
-      setConversations([]);
+      setSummaries([]);
+      setNotifications([]);
       return;
     }
     unsubscribersRef.current = [
       subscribeUsers(setProfiles),
       subscribeStatuses(setStatuses),
-      subscribeConversations(uid, setConversations),
+      subscribeChatSummaries(uid, setSummaries),
+      subscribeNotifications(uid, setNotifications),
       startPresence(uid),
     ];
     return stopListening;
   }, [uid, stopListening]);
 
-  const logout = useCallback(async () => {
-    if (!uid) {
+  // Thông tin (loại, tên nhóm, thành viên) của từng cuộc trò chuyện trong userChats
+  const convIdsKey = summaries
+    .map(s => s.id)
+    .sort()
+    .join(',');
+  useEffect(() => {
+    if (!convIdsKey) {
+      setMetas({});
       return;
     }
+    const unsubscribers = convIdsKey
+      .split(',')
+      .map(id =>
+        subscribeConversation(id, meta =>
+          setMetas(prev => ({ ...prev, [id]: meta })),
+        ),
+      );
+    return () => unsubscribers.forEach(unsubscribe => unsubscribe());
+  }, [convIdsKey]);
+
+  const logout = useCallback(async () => {
+    if (!uid) return;
     // Huỷ lắng nghe trước, nếu không Firebase sẽ báo permission_denied khi mất quyền đọc
     stopListening();
     await firebaseLogout(uid);
   }, [uid, stopListening]);
 
-  const users = useMemo<Contact[]>(
+  const allUsers = useMemo<Contact[]>(
     () =>
-      profiles
-        .filter(p => p.uid !== uid)
-        .map(p => ({ ...p, online: !!statuses[p.uid]?.online })),
-    [profiles, statuses, uid],
+      profiles.map(p => ({
+        ...p,
+        online: !!statuses[p.uid]?.online,
+        lastChanged: statuses[p.uid]?.lastChanged,
+      })),
+    [profiles, statuses],
+  );
+
+  const users = useMemo(
+    () => allUsers.filter(u => u.uid !== uid),
+    [allUsers, uid],
   );
 
   const account = useMemo<Account | null>(() => {
-    if (!authUser) {
-      return null;
-    }
+    if (!authUser) return null;
     const profile = profiles.find(p => p.uid === authUser.uid);
     const email = authUser.email ?? '';
     return {
@@ -129,21 +168,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [authUser, profiles]);
 
+  // Chỉ hiện cuộc trò chuyện đã tải được thông tin, mới nhất lên đầu
+  const conversations = useMemo<Conversation[]>(
+    () =>
+      summaries
+        .filter(s => metas[s.id])
+        .map(s => ({ ...s, meta: metas[s.id] as ConversationMeta }))
+        .sort((a, b) => b.updatedAt - a.updatedAt),
+    [summaries, metas],
+  );
+
+  const unreadNotificationCount = useMemo(
+    () => notifications.filter(n => !n.read).length,
+    [notifications],
+  );
+
   const value = useMemo<AppContextValue>(
     () => ({
       initializing,
       account,
       logout,
       users,
-      getUser: id => users.find(u => u.uid === id),
+      getUser: id => allUsers.find(u => u.uid === id),
       conversations,
+      getConversation: id => conversations.find(c => c.id === id),
       notifications,
-      markNotificationRead: id =>
-        setNotifications(prev =>
-          prev.map(n => (n.id === id ? { ...n, read: true } : n)),
-        ),
-      markAllNotificationsRead: () =>
-        setNotifications(prev => prev.map(n => ({ ...n, read: true }))),
+      unreadNotificationCount,
+      markNotificationRead: id => {
+        if (uid) markNotificationRead(uid, id).catch(() => {});
+      },
+      markAllNotificationsRead: () => {
+        if (!uid) return;
+        const ids = notifications.filter(n => !n.read).map(n => n.id);
+        markAllNotificationsRead(uid, ids).catch(() => {});
+      },
       darkMode,
       setDarkMode,
       notificationsEnabled,
@@ -155,8 +213,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       account,
       logout,
       users,
+      allUsers,
       conversations,
       notifications,
+      unreadNotificationCount,
+      uid,
       darkMode,
       notificationsEnabled,
     ],

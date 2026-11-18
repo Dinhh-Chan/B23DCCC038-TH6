@@ -1,132 +1,137 @@
-# Bài thực hành 5 – Chat 1-1 realtime với Firebase (React Native CLI)
+# Bài thực hành 6 – Chat nhóm, gửi ảnh, đã xem, thu hồi (React Native CLI + Firebase)
 
 Sinh viên: **Trần Đức Định** – MSSV: **B23DCCC038**
 
-Phát triển tiếp ứng dụng chat của Bài thực hành 4: thay dữ liệu mẫu bằng dữ liệu thời gian thực trên
-Firebase (Authentication Email/Password + Realtime Database) để hai người dùng nhắn tin trực tiếp với nhau.
+Phát triển tiếp ứng dụng chat của Bài thực hành 5, bổ sung các tính năng của một ứng dụng nhắn tin thực tế:
+chat nhóm, gửi ảnh (Cloudinary), trạng thái "đang soạn tin…" / "Đã xem", thu hồi tin nhắn, thả cảm xúc và
+màn hình Thông báo dùng dữ liệu thật.
 
 ## Chức năng
 
-| Yêu cầu | Màn hình / file |
+### Phần A – Bắt buộc
+
+| Yêu cầu | Cách làm | File chính |
+|---|---|---|
+| "đang soạn tin…" | `typing/{convId}/{uid}`, tự tắt sau 3 giây không gõ, khi gửi tin, khi rời màn hình hoặc app xuống nền | `ChatScreen.tsx`, `chatService.ts` |
+| "Đã gửi" / "Đã xem lúc HH:mm" | `readStatus/{convId}/{uid}` = thời điểm đọc cuối, so với `createdAt` tin cuối của mình. Nhóm: "Đã xem bởi A, B" | `ChatScreen.tsx` |
+| "Hoạt động X phút trước" | `status/{uid}.lastChanged`, tự cập nhật mỗi 30 giây | `utils.ts`, `useNow.ts` |
+| Không bị kẹt trạng thái | `onDisconnect()` cho online (`status`), đang gõ (`typing`) và đang xem (`viewing`) | `userService.ts`, `chatService.ts` |
+| Nhấn giữ tin | Menu: thả 👍 ❤️ 😂 😮 😢, Trả lời, Sao chép, Thu hồi (chỉ tin của mình) | `MessageActionSheet` |
+| Thu hồi | Không xoá node: đặt `recalled: true` và xoá nội dung. Nếu là tin cuối thì cập nhật cả dòng tin cuối ở Home | `chatService.recallMessage` |
+| Cảm xúc | `reactions/{uid}: emoji`, hiển thị dưới bong bóng kèm tổng số người thả | `MessageBubble` |
+| Gửi ảnh | Nút 📷: Chụp ảnh / Thư viện (`react-native-image-picker`), xin quyền camera, thu nhỏ cạnh dài ≤ 1024px, tải lên Cloudinary bằng unsigned preset, chỉ lưu URL | `uploadService.ts` |
+| Bong bóng tạm khi tải ảnh | Vòng loading + %, lỗi thì có nút "Thử lại" / huỷ | `PendingImageBubble` |
+| Xem ảnh toàn màn hình | Nhấn vào ảnh | `ImageViewer` |
+| Home: "📷 Hình ảnh", "📍 Vị trí" | Dòng tin cuối lấy từ `messagePreview()` | `conversation.ts` |
+| Tạo nhóm | Tên nhóm + chọn thành viên có checkbox, tối thiểu 2 người ngoài bản thân | `CreateGroupScreen.tsx`, `groupService.ts` |
+| Chat nhóm | Tên người gửi phía trên bong bóng, tiêu đề: tên nhóm + số thành viên đang online. Hỗ trợ tin thường, vị trí, ảnh | `ChatScreen.tsx` |
+| Home 1-1 + nhóm | Sắp theo tin mới nhất, mỗi thành viên có số chưa đọc riêng | `HomeScreen.tsx`, `AppContext.tsx` |
+| Thông báo thật | `notifications/{uid}`: tin mới khi không mở cuộc trò chuyện đó, được thêm vào nhóm, có người thả cảm xúc. Badge số chưa đọc, nhấn để mở đúng cuộc trò chuyện, "Đánh dấu tất cả đã đọc" | `notificationService.ts`, `NotificationsScreen.tsx` |
+
+### Phần B – Kỹ thuật
+
+- **Multi-path update:** `buildMessageUpdates()` gom tin nhắn, `lastMessage`/`lastMessageId`/`updatedAt` của mọi
+  thành viên, số chưa đọc (`increment(1)`) và thông báo vào **một** lệnh `update()`. Tạo nhóm, thêm/xoá thành viên,
+  rời nhóm, thu hồi, thả cảm xúc cũng đều là một lệnh `update()`.
+- **Phân trang:** lần đầu `limitToLast(20)`. Kéo lên đầu danh sách thì `endBefore(tin cũ nhất) + limitToLast(20)`.
+  Danh sách là FlatList `inverted` nên tin cũ được chèn phía trên mà không làm nhảy vị trí đang xem
+  (`hooks/useMessages.ts`).
+- **Listener:** mọi `onValue` / `onChildAdded` / `onChildChanged` đều được huỷ trong cleanup của `useEffect`.
+- **Không có API secret của Cloudinary trong mã nguồn:** chỉ dùng cloud name + unsigned upload preset.
+- **Code Firebase & Cloudinary** gom trong `src/services/`: `chatService.ts`, `groupService.ts`,
+  `uploadService.ts`, `notificationService.ts`, `userService.ts`, `authService.ts`.
+
+### Phần C – Nâng cao
+
+| Tính năng | File |
 |---|---|
-| Đăng ký (họ tên, email, mật khẩu ≥ 6 ký tự, nhập lại mật khẩu) | `src/screens/RegisterScreen.tsx` |
-| Đăng nhập Firebase, báo lỗi khi sai tài khoản/mật khẩu | `src/screens/LoginScreen.tsx` |
-| Đăng xuất ở Cài đặt → về màn hình Đăng nhập | `src/screens/SettingsScreen.tsx` |
-| Danh bạ: người dùng từ Firebase (trừ bản thân), online/offline realtime, tìm kiếm | `src/screens/ContactsScreen.tsx` |
-| Chat 1-1 realtime, tin của mình bên phải, có giờ gửi, không gửi tin rỗng, tự cuộn xuống | `src/screens/ChatScreen.tsx` |
-| Thanh tiêu đề chat: tên + trạng thái online | `src/screens/ChatScreen.tsx` |
-| Nút 📍 gửi vị trí (xin quyền, báo lỗi khi bị từ chối), nhấn tin vị trí → Google Maps | `ChatScreen.tsx`, `src/components/MessageBubble`, `src/services/locationService.ts` |
-| Home: ảnh, tên, tin cuối, thời gian, mới nhất trên cùng, số tin chưa đọc | `src/screens/HomeScreen.tsx` |
-| Thông báo: giữ như Bài 4 | `src/screens/NotificationsScreen.tsx` |
+| Quản trị nhóm: đổi tên, thêm / xoá thành viên (trưởng nhóm), rời nhóm, tin hệ thống "A đã rời nhóm" | `GroupInfoScreen.tsx`, `groupService.ts` |
+| Trả lời một tin cụ thể (trích dẫn), nhấn trích dẫn để cuộn tới tin gốc (tự tải thêm trang cũ nếu cần) | `ChatScreen.tsx`, `MessageBubble` |
+| Hồ sơ cá nhân: đổi họ tên, ảnh đại diện (tải lên Cloudinary), cập nhật ở Danh bạ, Home, Chat | `EditProfileScreen.tsx` |
+| Tìm kiếm nội dung tin nhắn trong cuộc trò chuyện (không phân biệt dấu, nhảy giữa các kết quả) | `ChatScreen.tsx` |
 
-## Cấu trúc mã nguồn
+## Cấu trúc dữ liệu
 
 ```
-src/
-├── services/            # Toàn bộ code Firebase (và định vị)
-│   ├── firebaseConfig.ts   # cấu hình project – CẦN ĐIỀN
-│   ├── firebase.ts         # khởi tạo app, auth, database
-│   ├── authService.ts      # đăng ký, đăng nhập, đăng xuất, thông báo lỗi tiếng Việt
-│   ├── userService.ts      # danh sách người dùng, trạng thái online (presence)
-│   ├── chatService.ts      # nghe/gửi tin nhắn, danh sách cuộc trò chuyện, số chưa đọc
-│   └── locationService.ts  # xin quyền, lấy vị trí, mở Google Maps
-├── contexts/AppContext.tsx # giữ trạng thái đăng nhập + dữ liệu realtime dùng chung
-├── navigation/             # Stack (Login/Register | Main/Chat) + Bottom Tabs
-├── screens/                # các màn hình
-├── components/             # Avatar, FormInput, MessageBubble, ConversationItem, ...
-└── commons/                # types, theme, hàm định dạng thời gian, dữ liệu mẫu thông báo
+users/{uid}                  { name, email, avatar, createdAt }
+status/{uid}                 { online, lastChanged }
+conversations/{convId}       { type: "direct" | "group", name, members: {uid: true}, createdBy, createdAt }
+messages/{convId}/{msgId}    { senderId, type: "text" | "image" | "location" | "system",
+                               text, imageUrl, lat, lng, createdAt, recalled, reactions: {uid: emoji},
+                               replyTo: {id, senderId, preview} }
+userChats/{uid}/{convId}     { lastMessage, lastSenderId, lastMessageId, updatedAt, unread }
+readStatus/{convId}/{uid}    thời điểm đọc cuối
+typing/{convId}/{uid}        true
+viewing/{convId}/{uid}       true khi đang mở cuộc trò chuyện (để không gửi thông báo thừa)
+notifications/{uid}/{id}     { type: "message" | "group_added" | "reaction", convId, fromUid, text, createdAt, read }
 ```
 
-## Cấu trúc dữ liệu trên Realtime Database
+- Chat 1-1: `convId = uidA_uidB` (2 uid đã sắp xếp), nên tin nhắn cũ của Bài 5 vẫn đọc được.
+- Chat nhóm: `convId = g_<pushId>`.
 
-```
-users/{uid}                    { name, email, avatar, createdAt }
-status/{uid}                   { online, lastChanged }
-messages/{chatId}/{messageId}  { senderId, type: "text" | "location",
-                                 text | latitude + longitude, createdAt }
-userChats/{uid}/{otherUid}     { chatId, lastMessage, lastSenderId, updatedAt, unread }
-```
+## Luật bảo mật
 
-- `chatId` = hai uid sắp xếp rồi nối bằng `_`, nên hai người luôn ra cùng một phòng chat.
-- Khi gửi tin, app dùng **một lệnh `update` nhiều đường dẫn** để ghi tin nhắn và cập nhật `userChats` của
-  cả hai người. Số chưa đọc của người nhận được tăng bằng `increment(1)` trên server.
-- Khi mở cuộc trò chuyện, app đặt `userChats/{tôi}/{người kia}/unread = 0`.
-- Online/offline: khi có kết nối (`.info/connected`), app ghi `online: true` và đăng ký
-  `onDisconnect()` để server tự ghi `online: false` khi app bị tắt hoặc mất mạng. App chuyển xuống nền
-  cũng ghi offline.
-- Mọi listener (`onValue`, `onChildAdded`) đều được huỷ trong cleanup của `useEffect`, nên tin nhắn
-  không bị hiện lặp khi mở lại màn hình.
+File [`database.rules.json`](database.rules.json):
 
-## Cài đặt Firebase
+- **Chỉ thành viên** (`conversations/{convId}/members/{uid}`) mới đọc được `messages`, `readStatus`, `typing`,
+  `viewing` của cuộc trò chuyện, và mới gửi được tin (`senderId` phải là chính mình).
+- **Tin nhắn chỉ được tạo mới, không được sửa.** Riêng `recalled` chỉ **người gửi** mới ghi được (và chỉ được ghi
+  `true`). Người gửi được xoá nội dung khi thu hồi.
+- **Mỗi người chỉ ghi `reactions/{uid}`, `typing/{convId}/{uid}`, `readStatus/{convId}/{uid}` của chính mình.**
+- `userChats/{uid}` chỉ chủ sở hữu đọc được. Thành viên của cùng cuộc trò chuyện được cập nhật dòng tin cuối /
+  số chưa đọc của nhau.
+- `notifications/{uid}` chỉ chủ sở hữu đọc và sửa được. Người khác chỉ được **tạo mới** thông báo do chính mình gây
+  ra (`fromUid`), và phải là thành viên của cuộc trò chuyện đó.
+- Với các thao tác tạo nhóm (nhóm và tin đầu tiên được ghi cùng lúc), membership được kiểm tra trên dữ liệu
+  **sau khi ghi** bằng `newData.parent()…`, vì trong một multi-path update thì `root` là dữ liệu cũ.
 
-1. Vào [Firebase Console](https://console.firebase.google.com) → **Add project**.
-2. **Build → Authentication → Get started → Sign-in method → Email/Password → Enable**.
-3. **Build → Realtime Database → Create database** (chọn khu vực, ví dụ Singapore) → bắt đầu ở *locked mode*.
-4. Tab **Rules**: dán luật bảo mật rồi bấm **Publish**. Nếu dùng luật do giảng viên cung cấp thì dán luật đó;
-   luật tương ứng với cấu trúc dữ liệu ở trên nằm trong file [`database.rules.json`](database.rules.json).
-5. **Project settings → General → Your apps → biểu tượng Web `</>`**, đăng ký app rồi copy `firebaseConfig`.
-6. Dán vào `src/services/firebaseConfig.ts`. Nhớ kiểm tra `databaseURL` khớp với link hiện ở tab
-   *Data* của Realtime Database. Database ở Singapore có dạng
-   `https://<project>-default-rtdb.asia-southeast1.firebasedatabase.app`.
+## Cấu hình
 
-> Nếu chưa điền cấu hình, màn hình Đăng nhập sẽ hiện dòng cảnh báo màu đỏ.
+### Firebase
+
+1. [Firebase Console](https://console.firebase.google.com) → tạo project.
+2. **Authentication → Sign-in method → Email/Password → Enable**.
+3. **Realtime Database → Create database**, tab **Rules**: dán nội dung `database.rules.json` → **Publish**.
+4. **Project settings → Your apps → Web app (`</>`)** → copy `firebaseConfig` vào `src/services/firebaseConfig.ts`.
+
+### Cloudinary (gửi ảnh, đổi ảnh đại diện)
+
+1. Đăng ký tài khoản miễn phí tại [cloudinary.com](https://cloudinary.com), ghi lại **Cloud name** ở trang Dashboard.
+2. **Settings (⚙) → Upload → Upload presets → Add upload preset**:
+   - **Signing mode: Unsigned**
+   - (tuỳ chọn) Folder: `chatapp`
+   - Lưu lại, ghi nhớ **tên preset**.
+3. Điền vào `src/services/cloudinaryConfig.ts`:
+   ```ts
+   export const cloudinaryConfig = {
+     cloudName: '<cloud name>',
+     uploadPreset: '<tên unsigned preset>',
+   };
+   ```
+   **Không** đưa API key / API secret vào app: unsigned preset không cần chữ ký.
 
 ## Chạy ứng dụng
 
 ```bash
 npm install
 npm start            # terminal 1: Metro
-npm run android      # terminal 2: build & cài lên máy ảo/thiết bị (chỉ build ABI của máy đang cắm)
+npm run android      # terminal 2: build & cài lên mọi máy ảo / thiết bị đang kết nối
 ```
 
-### Chạy 2 máy ảo để chat với nhau
+Phiên đăng nhập được lưu bằng AsyncStorage, nên tắt app mở lại không phải đăng nhập lại.
+
+**Chạy 3 máy ảo** từ cùng một AVD (cờ `-read-only`, port khác nhau):
 
 ```bash
-# Máy ảo thứ 2 có thể dùng chung AVD với máy 1 nhờ cờ -read-only
-emulator -avd Medium_Phone_API_36.1 &
-emulator -avd Medium_Phone_API_36.1 -read-only &
-adb devices          # thấy 2 thiết bị emulator-5554, emulator-5556
-npm run android      # khi không chỉ định thiết bị, app được cài lên tất cả máy đang kết nối
+emulator -avd Medium_Phone_API_36.1 -read-only -port 5556 -gpu swiftshader_indirect &
+emulator -avd Medium_Phone_API_36.1 -read-only -port 5558 -gpu swiftshader_indirect &
+emulator -avd Medium_Phone_API_36.1 -read-only -port 5560 -gpu swiftshader_indirect &
 ```
-
-Đăng ký 2 tài khoản khác nhau trên 2 máy rồi chat với nhau.
-
-**Gửi vị trí trên máy ảo:** mở *Extended controls (⋯) → Location*, chọn một điểm rồi bấm **Set location**
-trước khi bấm nút 📍.
-
-> Phiên đăng nhập chỉ giữ trong bộ nhớ (`inMemoryPersistence`), nên tắt app hoặc reload JS thì phải
-> đăng nhập lại. Cách này đủ cho yêu cầu bài và không cần thêm thư viện native AsyncStorage.
-
-## Video demo & ảnh chụp
-
-**Video** (1 phút 56 giây, 2 máy ảo đặt cạnh nhau): [`demo/B23DCCC038-TH05-demo.mp4`](demo/B23DCCC038-TH05-demo.mp4)
-
-| Thời điểm | Nội dung |
-|---|---|
-| 0:00 | Danh bạ hai máy thấy nhau "Đang hoạt động" |
-| 0:05 – 0:35 | tk1 gửi 2 tin, Home của tk2 tăng số chưa đọc 1 → 2 ngay lập tức |
-| 0:40 – 1:05 | tk2 mở cuộc trò chuyện (chưa đọc về 0), trả lời, tin hiện ngay bên tk1 |
-| 1:10 – 1:25 | tk2 bấm 📍: hỏi quyền vị trí → gửi tin vị trí, hiện ở cả hai máy |
-| 1:30 – 1:40 | tk1 bấm tin vị trí → Google Maps mở đúng toạ độ; tk2 thấy tk1 "Ngoại tuyến" |
-| 1:40 – 1:56 | tk2 thoát ra màn hình chính → tk1 thấy "Ngoại tuyến", mở lại → "Đang hoạt động" |
-
-**Ảnh chụp** (thư mục [`screenshots/`](screenshots/)):
-
-| File | Màn hình |
-|---|---|
-| `1-register.png` | Đăng ký |
-| `2-home-unread.png` | Home có số tin chưa đọc |
-| `3-contacts-online.png` | Danh bạ có trạng thái online |
-| `4-chat-text-location.png` | Chat có tin thường và tin vị trí (người gửi) |
-| `5-chat-receiver.png` | Cùng cuộc trò chuyện ở máy người nhận |
-| `6-firebase-data.jpg`, `7-firebase-data-location.jpg` | Firebase Console – tab Data, dữ liệu tin nhắn |
 
 ## Sản phẩm nộp
 
-- Mã nguồn (không kèm `node_modules`, `android/build`, `android/app/build`, `ios/Pods`):
-  ```bash
-  cd .. && zip -r B23DCCC038-TH05.zip baithuchanh5 \
-    -x "baithuchanh5/node_modules/*" "baithuchanh5/android/build/*" "baithuchanh5/android/app/build/*" \
-       "baithuchanh5/android/app/.cxx/*" "baithuchanh5/android/.gradle/*" "baithuchanh5/ios/Pods/*"
-  ```
-- Ảnh chụp và video: xem mục trên.
+- Mã nguồn (không kèm `node_modules`, `android/build`, `android/app/build`, `ios/Pods`) + `database.rules.json`
+  + README này.
+- Ảnh chụp màn hình: thư mục [`screenshots/`](screenshots/).
+- Video demo: thư mục [`demo/`](demo/).
+- Báo cáo luật bảo mật: [`docs/`](docs/).

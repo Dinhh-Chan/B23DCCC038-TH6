@@ -11,5 +11,8 @@ export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Main: NavigatorScreenParams<MainTabParamList>;
-  Chat: { userId: string }; // uid của người muốn chat cùng
+  Chat: { convId: string }; // 1-1: "uidA_uidB", nhóm: "g_..."
+  CreateGroup: undefined;
+  GroupInfo: { convId: string };
+  EditProfile: undefined;
 };

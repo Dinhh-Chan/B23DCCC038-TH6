@@ -7,6 +7,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, StatusBar, StyleSheet, View } from 'react-native';
 import { useApp } from '../contexts/AppContext';
 import ChatScreen from '../screens/ChatScreen';
+import CreateGroupScreen from '../screens/CreateGroupScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import GroupInfoScreen from '../screens/GroupInfoScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import MainTabs from './MainTabs';
@@ -46,6 +49,9 @@ export default function RootNavigator() {
           <>
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
+            <Stack.Screen name="GroupInfo" component={GroupInfoScreen} />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           </>
         ) : (
           // Khi đăng xuất, account = null -> tự động quay về màn hình Đăng nhập

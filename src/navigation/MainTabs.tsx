@@ -10,10 +10,13 @@ import { MainTabParamList } from './types';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export default function MainTabs() {
-  const { colors, conversations, notifications, notificationsEnabled } =
-    useApp();
+  const {
+    colors,
+    conversations,
+    unreadNotificationCount,
+    notificationsEnabled,
+  } = useApp();
   const unreadChats = conversations.filter(c => c.unread > 0).length;
-  const unreadNotis = notifications.filter(n => !n.read).length;
 
   return (
     <Tab.Navigator
@@ -53,7 +56,8 @@ export default function MainTabs() {
         component={NotificationsScreen}
         options={{
           title: 'Thông báo',
-          tabBarBadge: (notificationsEnabled && unreadNotis) || undefined,
+          tabBarBadge:
+            (notificationsEnabled && unreadNotificationCount) || undefined,
           tabBarIcon: ({ color, size }) => <Bell color={color} size={size} />,
         }}
       />
