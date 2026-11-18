@@ -23,14 +23,20 @@ type Props = {
 
 const IMAGE_WIDTH = 220;
 
-// Ảnh giữ đúng tỉ lệ: đo kích thước thật khi tải xong rồi tính chiều cao
+// Ảnh giữ đúng tỉ lệ: đo kích thước thật khi tải xong rồi tính chiều cao.
+// Tải lỗi (vd. vừa mất mạng) thì tự thử lại vài lần
 function ChatImage({ uri, onPress }: { uri: string; onPress: () => void }) {
   const [ratio, setRatio] = useState(1);
+  const [attempt, setAttempt] = useState(0);
   const height = Math.min(320, Math.max(120, IMAGE_WIDTH / ratio));
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
       <Image
+        key={attempt}
         source={{ uri }}
+        onError={() => {
+          if (attempt < 5) setTimeout(() => setAttempt(a => a + 1), 3000);
+        }}
         style={[styles.image, { width: IMAGE_WIDTH, height }]}
         onLoad={e => {
           const { width, height: h } = e.nativeEvent.source;

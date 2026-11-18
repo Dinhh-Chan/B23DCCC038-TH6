@@ -77,7 +77,7 @@ export function uploadImage(
       }
     };
     xhr.onerror = () => reject(new Error('Lỗi mạng khi tải ảnh lên'));
-    xhr.timeout = 60000;
+    xhr.timeout = 30000; // mất mạng giữa chừng -> báo lỗi để hiện nút "Thử lại"
     xhr.ontimeout = () => reject(new Error('Hết thời gian tải ảnh lên'));
 
     const form = new FormData();

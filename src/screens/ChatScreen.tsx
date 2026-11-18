@@ -298,8 +298,12 @@ export default function ChatScreen({ navigation, route }: Props) {
         const imageUrl = await uploadImage(item.uri, progress =>
           patch({ progress }),
         );
-        await send({ type: 'image', imageUrl });
+        // Tải lên xong là bỏ bong bóng tạm: Firebase hiện tin ngay trong danh sách
+        // và tự đồng bộ lên server khi có mạng
         setPending(list => list.filter(p => p.id !== item.id));
+        send({ type: 'image', imageUrl }).catch(() =>
+          Alert.alert('Gửi thất bại', 'Không gửi được tin ảnh, hãy thử lại.'),
+        );
       } catch (error) {
         patch({ error: (error as Error).message || 'Lỗi' });
       }
