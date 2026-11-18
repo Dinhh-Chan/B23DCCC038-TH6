@@ -123,15 +123,46 @@ Phiên đăng nhập được lưu bằng AsyncStorage, nên tắt app mở lạ
 **Chạy 3 máy ảo** từ cùng một AVD (cờ `-read-only`, port khác nhau):
 
 ```bash
-emulator -avd Medium_Phone_API_36.1 -read-only -port 5556 -gpu swiftshader_indirect &
-emulator -avd Medium_Phone_API_36.1 -read-only -port 5558 -gpu swiftshader_indirect &
-emulator -avd Medium_Phone_API_36.1 -read-only -port 5560 -gpu swiftshader_indirect &
+emulator -avd Medium_Phone_API_36.1 -read-only -port 5556 -gpu host &
+emulator -avd Medium_Phone_API_36.1 -read-only -port 5558 -gpu host &
+emulator -avd Medium_Phone_API_36.1 -read-only -port 5560 -gpu host &
 ```
 
 ## Sản phẩm nộp
 
-- Mã nguồn (không kèm `node_modules`, `android/build`, `android/app/build`, `ios/Pods`) + `database.rules.json`
-  + README này.
-- Ảnh chụp màn hình: thư mục [`screenshots/`](screenshots/).
-- Video demo: thư mục [`demo/`](demo/).
-- Báo cáo luật bảo mật: [`docs/`](docs/).
+- **Mã nguồn** (không kèm `node_modules`, `android/build`, `android/app/build`, `ios/Pods`), kèm
+  [`database.rules.json`](database.rules.json) và README này.
+- **Báo cáo luật bảo mật (1 trang):** [`docs/BaoCao_LuatBaoMat_B23DCCC038.docx`](docs/BaoCao_LuatBaoMat_B23DCCC038.docx)
+  (bản PDF cùng thư mục).
+
+### Video demo
+
+[`demo/B23DCCC038-TH06-demo.mp4`](demo/B23DCCC038-TH06-demo.mp4) – 2 phút 52 giây, 3 máy ảo đặt cạnh nhau
+(Máy 1 – tk1, Máy 2 – Dinh Tran, Máy 3 – tk2):
+
+| Thời điểm | Nội dung |
+|---|---|
+| 0:00 – 0:20 | tk1 gửi 2 tin vào nhóm → Home của 2 máy kia tăng số chưa đọc 1 → 2, badge Thông báo tăng |
+| 0:20 – 0:45 | Dinh Tran rồi tk2 mở nhóm → số chưa đọc về 0, tk1 thấy "Đã xem bởi Dinh Tran" rồi "Đã xem bởi tất cả" |
+| 0:45 – 1:00 | Dinh Tran gõ → tk1, tk2 thấy "Dinh Tran đang soạn tin…"; gửi → tin hiện ngay ở cả 3 máy |
+| 1:00 – 1:25 | tk2 gửi ảnh từ thư viện: bong bóng tạm "Đang gửi…" → ảnh hiện ở cả 3 máy |
+| 1:25 – 1:50 | tk1 và tk2 thả ❤️ → "❤️ 2" dưới tin của Dinh Tran |
+| 1:50 – 2:10 | tk1 gửi nhầm một tin, nhấn giữ → Thu hồi |
+| 2:10 – 2:35 | Dinh Tran mở Thông báo (badge 4) → "Đánh dấu tất cả đã đọc" → badge về 0 |
+| 2:35 – 2:52 | Xác nhận thu hồi → tin hiện "Tin nhắn đã được thu hồi" ở mọi máy, dòng tin cuối ở Home cũng đổi theo |
+
+### Ảnh chụp màn hình (thư mục [`screenshots/`](screenshots/))
+
+| File | Nội dung |
+|---|---|
+| `1-tao-nhom.png` | Màn hình Tạo nhóm (tên nhóm + chọn thành viên có checkbox) |
+| `2-home-unread-badge.png` | Home có số tin chưa đọc và badge tab Thông báo |
+| `3-dang-soan-tin-va-da-xem.png` | Chat có "Dinh Tran đang soạn tin…" và "Đã xem bởi tất cả" |
+| `4-tin-anh.png`, `4b-anh-dang-tai-len.png` | Tin ảnh; bong bóng tạm khi đang tải ảnh lên |
+| `5-nhom-ten-nguoi-gui.png` | Chat nhóm có tên người gửi phía trên bong bóng |
+| `6-thu-hoi-va-cam-xuc.png` | Tin đã thu hồi và tin có cảm xúc "❤️ 2" |
+| `7-thong-bao-badge.png` | Màn hình Thông báo có badge |
+| `firebase-console/1-data-conversations.jpg` | Firebase Console – tab Data, nhánh `conversations` |
+| `firebase-console/2-data-userChats.jpg` | Firebase Console – tab Data, nhánh `userChats` |
+| `firebase-console/3-rules.jpg` | Firebase Console – tab Rules |
+| `firebase-console/4-rules-playground-denied.jpg` | Rules Playground: người ngoài nhóm đọc tin nhắn → "Simulated read denied" |
